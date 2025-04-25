@@ -435,7 +435,7 @@ combined_gsea_df <- combined_gsea_df %>%
 combined_gsea_df <- combined_gsea_df %>%
   mutate(
     adjusted_size = case_when(
-      Virus == "West Nile Virus" ~ abs(NES) * 1.1,  # inflate slightly (10%)
+      Virus == "West Nile Virus" ~ abs(NES)
       TRUE ~ abs(NES)
     )
   )
