@@ -1,0 +1,458 @@
+---
+title: "Genomic_Repeat_analysis"
+author: "Vyas Koduvayur"
+date: "2025-04-05"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(Biostrings)
+library(ggplot2)
+library(gridExtra)
+library(dplyr)
+library(tidyr)
+
+```
+
+
+DINUCLEOTIDE AND TRINUCLEOTIDE REPEATS
+```{r}
+# List FASTA files
+fasta_files <- c("sequence.fasta", "sequence2.fasta", "sequence3.fasta", "sequence4.fasta", 
+                 "sequence5.fasta", "sequence6.fasta", "sequence7.fasta", "sequence8.fasta",
+                 "sequence9.fasta", "sequence10.fasta", "sequence11.fasta", "sequence12.fasta",
+                 "sequence13.fasta", "sequence14.fasta", "sequence15.fasta", "sequence16.fasta")
+
+# Function to load and clean a sequence
+clean_fasta_sequence <- function(file) {
+  seq <- readDNAStringSet(file)
+  seq_char <- as.character(seq)
+  seq_clean <- gsub("[^ATGC]", "", paste(seq_char, collapse = ""))
+  return(seq_clean)
+}
+
+# Get all cleaned sequences
+all_sequences <- lapply(fasta_files, clean_fasta_sequence)
+
+# Function to find repeats in a sequence
+find_repeats <- function(sequence, repeat_length) {
+  seq_str <- paste(sequence, collapse = "")
+  motifs <- sapply(1:(nchar(seq_str) - repeat_length + 1), function(i) {
+    substr(seq_str, i, i + repeat_length - 1)
+  })
+  repeats <- table(motifs)
+  return(repeats)
+}
+
+# Function to aggregate repeat counts from multiple sequences
+aggregate_repeats <- function(sequences, repeat_length) {
+  combined_counts <- list()
+  for (seq in sequences) {
+    repeats <- find_repeats(seq, repeat_length)
+    for (motif in names(repeats)) {
+      combined_counts[[motif]] <- (combined_counts[[motif]] %||% 0) + repeats[[motif]]
+    }
+  }
+  return(as.table(unlist(combined_counts)))
+}
+
+# Function to calculate average nucleotide frequencies
+average_nuc_freq <- function(sequences) {
+  nuc_totals <- c(A = 0, T = 0, G = 0, C = 0)
+  for (seq in sequences) {
+    nucleotides <- table(unlist(strsplit(seq, "")))
+    for (nuc in names(nucleotides)) {
+      nuc_totals[[nuc]] <- nuc_totals[[nuc]] + nucleotides[[nuc]]
+    }
+  }
+  total <- sum(nuc_totals)
+  return(nuc_totals / total)
+}
+
+
+# Calculate O/E ratio per sequence and adds error bars
+plot_avg_OE_ratio_with_error <- function(sequences, repeat_length, nuc_freq, title) {
+  motif_list <- list()
+
+  for (seq in sequences) {
+    repeats <- find_repeats(seq, repeat_length)
+    total_repeats <- sum(repeats)
+    
+    df <- data.frame(
+      Motif = names(repeats),
+      Observed = as.numeric(repeats)
+    )
+    df$Observed_Freq <- df$Observed / total_repeats
+    
+    df$Expected_Freq <- sapply(df$Motif, function(motif) {
+      bases <- unlist(strsplit(motif, ""))
+      prod(nuc_freq[bases])
+    })
+    
+    df$OE_Ratio <- df$Observed_Freq / df$Expected_Freq
+    motif_list[[length(motif_list) + 1]] <- df[, c("Motif", "OE_Ratio")]
+  }
+
+  # Combine all O/E ratios
+  combined_df <- bind_rows(motif_list, .id = "SeqID")
+  summary_df <- combined_df %>%
+    group_by(Motif) %>%
+    summarise(
+      Mean_OE = mean(OE_Ratio, na.rm = TRUE),
+      SD_OE = sd(OE_Ratio, na.rm = TRUE),
+      .groups = "drop"
+    )
+  
+  ggplot(summary_df, aes(x = reorder(Motif, -Mean_OE), y = Mean_OE)) +
+    geom_bar(stat = "identity", fill = "#66c2a5") +
+    geom_errorbar(aes(ymin = Mean_OE - SD_OE, ymax = Mean_OE + SD_OE), width = 0.3) +
+    theme_minimal() +
+    labs(title = paste("Average O/E Ratio for", title), x = "Motif", y = "O/E Ratio") +
+    theme(axis.text.x = element_text(angle = 90, size = 6, hjust = 1))
+}
+
+# Recalculate dinucleotide and trinucleotide plots with error bars
+di_plot <- plot_avg_OE_ratio_with_error(all_sequences, 2, nuc_freq_avg, "Dinucleotide Repeats")
+tri_plot <- plot_avg_OE_ratio_with_error(all_sequences, 3, nuc_freq_avg, "Trinucleotide Repeats")
+
+# Plot vertically
+grid.arrange(di_plot, tri_plot, ncol = 1)
+
+
+
+
+```
+
+STATISTICS
+```{r}
+# STATISTICS
+
+# Is CG less than the other ones? wilcoxon test
+# Extract per-sequence OE ratios for dinucleotides
+motif_oe_dinuc <- motif_list_dinuc <- list()
+for (seq in all_sequences) {
+  repeats <- find_repeats(seq, 2)
+  total <- sum(repeats)
+  df <- data.frame(
+    Motif = names(repeats),
+    Observed = as.numeric(repeats)
+  )
+  df$Observed_Freq <- df$Observed / total
+  df$Expected_Freq <- sapply(df$Motif, function(motif) {
+    bases <- unlist(strsplit(motif, ""))
+    prod(nuc_freq_avg[bases])
+  })
+  df$OE_Ratio <- df$Observed_Freq / df$Expected_Freq
+  motif_oe_dinuc[[length(motif_oe_dinuc) + 1]] <- df[, c("Motif", "OE_Ratio")]
+}
+combined_dinuc_df <- bind_rows(motif_oe_dinuc, .id = "SeqID")
+
+# Extract CG vs others
+cg_oe <- combined_dinuc_df %>% filter(Motif == "CG") %>% pull(OE_Ratio)
+other_oe <- combined_dinuc_df %>% filter(Motif != "CG") %>%
+  group_by(SeqID) %>%
+  summarise(Mean_OE = mean(OE_Ratio, na.rm = TRUE)) %>%
+  pull(Mean_OE)
+
+# Mann-Whitney test (CG vs others)
+cg_test <- wilcox.test(cg_oe, other_oe, alternative = "less")
+cat("P-value (CG vs others) using O/E ratios:", cg_test$p.value, "\n")
+
+# Get O/E ratios for trinucleotides
+tri_summary_df <- tri_summary_df %>% filter(nchar(Motif) == 3)
+
+# Sort the O/E ratios for trinucleotides
+sorted_tri_oe <- sort(tri_summary_df$Mean_OE)
+
+# Bottom 8 trinucleotides
+bottom_8_oe <- sorted_tri_oe[1:8]
+rest_oe <- sorted_tri_oe[-(1:8)]
+
+# Perform the Wilcoxon rank-sum test
+test_result <- wilcox.test(bottom_8_oe, rest_oe, alternative = "less")
+
+# Output the result
+cat("P-value for bottom 8 trinucleotides vs the rest (Wilcoxon test):", test_result$p.value, "\n")
+```
+
+PLOT TRINUCLEOTIDE REPEATS FOR WESTNILE
+```{r}
+# Load and clean all West Nile sequences
+westnile_files <- paste0("sequence", 1:12, "_westnile.fasta")
+westnile_sequences <- lapply(westnile_files, clean_fasta_sequence)
+
+# Calculate dinucleotide and trinucleotide repeats
+di_repeats_westnile_all <- lapply(westnile_sequences, function(seq) find_repeats(seq, 2))
+tri_repeats_westnile_all <- lapply(westnile_sequences, function(seq) find_repeats(seq, 3))
+
+# Calculate average nucleotide frequencies for West Nile
+nuc_freq_westnile_avg <- average_nuc_freq(westnile_sequences)
+
+# Plot with error bars for West Nile
+di_plot_westnile_err <- plot_avg_OE_ratio_with_error(westnile_sequences, 2, nuc_freq_westnile_avg, "Dinucleotide Repeats (West Nile)")
+tri_plot_westnile_err <- plot_avg_OE_ratio_with_error(westnile_sequences, 3, nuc_freq_westnile_avg, "Trinucleotide Repeats (West Nile)")
+
+# Plot vertically
+grid.arrange(di_plot_westnile_err, tri_plot_westnile_err, ncol = 1)
+
+```
+
+COMPARE CPG TRINUCLEOTIDES IN RHINO v. WESTNILE
+```{r}
+# Recalculate CG O/E ratios across all sequences
+
+# Rhino: CG O/E from multiple sequences
+cg_ratios_rhino <- sapply(all_sequences, function(seq) {
+  rep <- find_repeats(seq, 2)
+  freq <- rep["CG"] / sum(rep)
+  expected <- nuc_freq_avg["C"] * nuc_freq_avg["G"]
+  freq / expected
+})
+
+# West Nile: CG O/E from multiple sequences
+cg_ratios_westnile <- sapply(westnile_sequences, function(seq) {
+  rep <- find_repeats(seq, 2)
+  freq <- rep["CG"] / sum(rep)
+  expected <- nuc_freq_westnile_avg["C"] * nuc_freq_westnile_avg["G"]
+  freq / expected
+})
+
+# Plot CG O/E with error bars
+cg_df <- data.frame(
+  Group = rep(c("Rhinovirus", "West Nile"), times = c(length(cg_ratios_rhino), length(cg_ratios_westnile))),
+  OERatio = c(cg_ratios_rhino, cg_ratios_westnile)
+)
+
+ggplot(cg_df, aes(x = Group, y = OERatio, fill = Group)) +
+  geom_boxplot(outlier.shape = NA) +
+  stat_summary(fun = mean, geom = "point", shape = 21, size = 3, fill = "white") +
+  labs(title = "O/E Ratio for CG Dinucleotide", y = "O/E Ratio", x = "") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, size = 12, face = "bold"))
+
+# Wilcoxon test for CG O/E ratios
+wilcox.test(cg_ratios_rhino, cg_ratios_westnile)
+
+# Function to get CG trinuc O/E per sequence set
+get_oe_ratios_per_seq <- function(sequences, motifs, nuc_freq_avg) {
+  do.call(rbind, lapply(sequences, function(seq) {
+    reps <- find_repeats(seq, 3)
+    total <- sum(reps)
+    data.frame(
+      Motif = motifs,
+      OERatio = sapply(motifs, function(m) {
+        obs <- ifelse(is.na(reps[m]), 0, reps[m]) / total
+        exp <- prod(nuc_freq_avg[unlist(strsplit(m, ""))])
+        obs / exp
+      })
+    )
+  }))
+}
+
+# Get O/E ratios for each motif across all rhinovirus and westnile sequences
+rhino_cg_oe_df <- get_oe_ratios_per_seq(all_sequences, cg_motifs, nuc_freq_avg)
+rhino_cg_oe_df$Group <- "Rhinovirus"
+
+west_cg_oe_df <- get_oe_ratios_per_seq(westnile_sequences, cg_motifs, nuc_freq_westnile_avg)
+west_cg_oe_df$Group <- "West Nile"
+
+# Combine and plot with error bars
+combined_cg_df <- rbind(rhino_cg_oe_df, west_cg_oe_df)
+
+summary_cg_df <- summary_cg_df %>%
+  mutate(Motif = factor(Motif, levels = summary_cg_df %>%
+                         filter(Group == "Rhinovirus") %>%
+                         arrange(Mean) %>%
+                         pull(Motif)))
+
+custom_colors <- c("Rhinovirus" = "#66c2a5", "West Nile" = "#8da0cb")
+
+
+ggplot(summary_cg_df, aes(x = Motif, y = Mean, fill = Group)) +
+  geom_bar(stat = "identity", position = position_dodge(0.8)) +
+  geom_errorbar(aes(ymin = Mean - SD, ymax = Mean + SD),
+                position = position_dodge(0.8), width = 0.3) +
+  labs(title = "O/E Ratios of CG-Containing Trinucleotides",
+       x = "Motif", y = "O/E Ratio") +
+  scale_fill_manual(values = custom_colors) +  # Apply custom colors
+
+   theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        plot.title = element_text(hjust = 0.5, size = 12)) +  # Fixed placement of + 
+  guides(fill = guide_legend(title = "Virus"))  # Change legend title to "Virus"
+
+# Wilcoxon test across averaged motif values
+rhino_means <- summary_cg_df %>% filter(Group == "Rhinovirus") %>% pull(Mean)
+west_means <- summary_cg_df %>% filter(Group == "West Nile") %>% pull(Mean)
+
+wilcox.test(rhino_means, west_means)
+
+
+```
+`
+
+
+
+PLOT GC CONTENT
+```{r}
+# First, modify compute_ATGC_summary to also return SD
+compute_ATGC_summary <- function(fasta_files, virus_name) {
+  sequences <- setNames(lapply(fasta_files, clean_fasta_sequence), fasta_files)
+  names(sequences) <- tools::file_path_sans_ext(basename(names(sequences)))
+  
+  content_ratios <- lapply(names(sequences), function(sample_name) {
+    seq <- sequences[[sample_name]]
+    nucleotides <- table(unlist(strsplit(seq, "")))
+    total <- sum(nucleotides)
+    
+    A <- ifelse(!is.na(nucleotides["A"]), nucleotides["A"], 0)
+    T <- ifelse(!is.na(nucleotides["T"]), nucleotides["T"], 0)
+    G <- ifelse(!is.na(nucleotides["G"]), nucleotides["G"], 0)
+    C <- ifelse(!is.na(nucleotides["C"]), nucleotides["C"], 0)
+    
+    A_T <- A + T
+    G_C <- G + C
+    
+    data.frame(
+      Sample = sample_name,
+      A_T_freq = A_T / total,
+      G_C_freq = G_C / total,
+      Virus = virus_name
+    )
+  })
+  
+  df <- bind_rows(content_ratios)
+  
+  df_long <- df %>%
+    pivot_longer(cols = c(A_T_freq, G_C_freq), names_to = "Category", values_to = "Frequency") %>%
+    group_by(Virus, Category) %>%
+    summarise(
+      Mean = mean(Frequency),
+      SD = sd(Frequency),
+      .groups = 'drop'
+    )
+  
+  return(df_long)
+}
+
+# Get data
+rhinovirus_df <- compute_ATGC_summary(rhinovirus_files, "Rhinovirus")
+westnile_df <- compute_ATGC_summary(westnile_files, "West Nile Virus")
+
+final_df <- bind_rows(rhinovirus_df, westnile_df)
+
+# Compute positions for stacking
+final_df <- final_df %>%
+  group_by(Virus) %>%
+  mutate(
+    ymin = cumsum(lag(Mean, default = 0)),
+    ymax = ymin + Mean,
+    label_pos = ymin + Mean / 2
+  )
+
+# Plot
+ggplot(final_df, aes(x = Virus, y = Mean, fill = Category)) +
+  geom_bar(stat = "identity", width = 0.6) +
+  geom_errorbar(aes(ymin = ymax - SD, ymax = ymax + SD), width = 0.2, color = "black", size = 0.6) +
+  geom_text(aes(y = label_pos, label = paste0(round(Mean * 100), "%")),
+            color = "black", size = 4.2) +
+  coord_flip() +
+  scale_fill_manual(values = c("A_T_freq" = "#66c2a5", "G_C_freq" = "#fc8d62"),
+                    labels = c("A/T", "G/C")) +
+  labs(title = "A/T and G/C Content Across Viral Genomes with Error Bars",
+       x = "", y = "Average Proportion",
+       fill = "Nucleotide Content") +
+  theme_minimal() +
+  theme(
+    axis.text = element_text(size = 11, color = "black"),
+    axis.title = element_text(size = 11, color = "black"),
+    plot.title = element_text(size = 13, hjust = 0.5),
+    legend.title = element_text(size = 10),
+    legend.text = element_text(size = 10)
+  )
+
+```
+
+
+```{r}
+# Function to plot A/T vs G/C frequencies with violin and boxplot overlay
+plot_AT_GC_violin_box <- function(df, title_text, fill_colors) {
+  ggplot(df, aes(x = Category, y = Frequency, fill = Category)) +
+    geom_violin(
+      trim = TRUE,
+      color = "black",
+      size = 0.7,
+      alpha = 0.4
+    ) +
+    geom_boxplot(
+      width = 0.2,
+      outlier.shape = NA,
+      color = "black",
+      fill = "transparent",
+      size = 1
+    ) +
+    geom_jitter(
+      width = 0.1,
+      height = 0,
+      shape = 21,
+      color = "black",
+      fill = "white",
+      size = 2,
+      alpha = 0.7
+    ) +
+    scale_fill_manual(values = fill_colors) +
+    labs(title = title_text, x = "Nucleotide Category", y = "Frequency") +
+    theme_minimal() +
+    theme(
+      axis.text.x = element_text(size = 10, color = "black", face = "bold"),
+      axis.text.y = element_text(size = 10, color = "black"),
+      axis.title.x = element_text(size = 10, color = "black", face = "bold"),
+      axis.title.y = element_text(size = 10, color = "black", face = "bold"),
+      plot.title = element_text(size = 12, face = "bold", color = "#2D3C5D", hjust = 0.5),
+      plot.margin = margin(10, 20, 20, 10),
+      panel.grid.major = element_line(color = "grey80", size = 0.5),
+      panel.grid.minor = element_line(color = "grey90", size = 0.3)
+    ) +
+    scale_y_continuous(expand = c(0, 0.05))
+}
+
+# Update the processing function to use the violin plot
+process_sequences_violin_box <- function(fasta_files, title_text, fill_colors) {
+  sequences <- setNames(lapply(fasta_files, clean_fasta_sequence), fasta_files)
+  names(sequences) <- tools::file_path_sans_ext(basename(names(sequences)))
+  
+  content_ratios <- compute_frequencies(sequences)
+  
+  # Combine into one data frame
+  content_df <- bind_rows(content_ratios)
+  
+  # Convert to long format for plotting
+  long_df <- content_df %>%
+    pivot_longer(cols = c(A_T_freq, G_C_freq), names_to = "Category", values_to = "Frequency") %>%
+    mutate(Category = recode(Category, A_T_freq = "A/T", G_C_freq = "G/C"))
+  
+  plot_AT_GC_violin_box(long_df, title_text, fill_colors)
+}
+
+# Example usage for Rhinovirus and West Nile Virus
+
+# Rhinovirus sequence files
+rhinovirus_files <- c("sequence.fasta", "sequence2.fasta", "sequence3.fasta", "sequence4.fasta", 
+                      "sequence5.fasta", "sequence6.fasta", "sequence7.fasta", "sequence8.fasta",
+                      "sequence9.fasta", "sequence10.fasta", "sequence11.fasta", "sequence12.fasta",
+                      "sequence13.fasta", "sequence14.fasta", "sequence15.fasta", "sequence16.fasta")
+
+# West Nile Virus sequence files
+westnile_files <- lapply(1:12, function(i) paste0("sequence", i, "_westnile.fasta"))
+
+# Plotting
+plot_rhinovirus <- process_sequences_violin_box(rhinovirus_files, "Average Rhinovirus A/T vs G/C Frequencies", c("A/T" = "#66c2a5", "G/C" = "#66c2a5"))
+plot_westnile <- process_sequences_violin_box(westnile_files, "Average West Nile Virus A/T vs G/C Frequencies", c("A/T" = "#8da0cb", "G/C" = "#8da0cb"))
+
+# Arrange both plots in a grid
+grid.arrange(plot_rhinovirus, plot_westnile, ncol = 2)
+
+```
+
+

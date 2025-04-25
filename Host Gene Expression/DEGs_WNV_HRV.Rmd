@@ -1,0 +1,486 @@
+---
+title: "Rhinovirus_WNV_DEGs"
+author: "Vyas Koduvayur"
+date: "2025-04-10"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# Setup
+library(oligo)
+library(limma)
+library(pd.hugene.2.1.st)  
+library(annotate)
+library(Biobase)
+library(ggplot2)
+library(ggrepel)
+
+library(DESeq2)
+library(tximport)
+library(readr)
+library(dplyr)
+library(biomaRt)
+
+library(AnnotationDbi)
+
+library(clusterProfiler)
+library(tibble)
+
+library(org.Hs.eg.db)
+library(stringr)
+
+```
+
+RHINOVIRUS: MICROARRAY PROCESSING
+```{r}
+
+# Define file paths to your CEL files
+cel_files <- c(
+  "C:/Users/Vyas/Documents/Biohack Rhinovirus Study/Host Gene Expression/GSM2858391_Hershenson_001_011.CEL.gz",
+  "C:/Users/Vyas/Documents/Biohack Rhinovirus Study/Host Gene Expression/GSM2858393_Hershenson_003_013.CEL.gz",
+  "C:/Users/Vyas/Documents/Biohack Rhinovirus Study/Host Gene Expression/GSM2858398_Hershenson_017_031.CEL.gz",
+  "C:/Users/Vyas/Documents/Biohack Rhinovirus Study/Host Gene Expression/GSM2858400_Hershenson_019_033.CEL.gz",
+  "C:/Users/Vyas/Documents/Biohack Rhinovirus Study/Host Gene Expression/GSM2858402_Hershenson_024_041.CEL.gz",
+  "C:/Users/Vyas/Documents/Biohack Rhinovirus Study/Host Gene Expression/GSM2858404_Hershenson_026_043.CEL.gz",
+  "C:/Users/Vyas/Documents/Biohack Rhinovirus Study/Host Gene Expression/GSM2858406_Hershenson_031_051.CEL.gz",
+  "C:/Users/Vyas/Documents/Biohack Rhinovirus Study/Host Gene Expression/GSM2858408_Hershenson_033_053.CEL.gz"
+)
+
+# Sample names in order
+sample_names <- c(
+  "Control1", "RV1", "Control2", "RV2",
+  "Control3", "RV3", "Control4", "RV4"
+)
+
+# Corresponding conditions
+condition <- factor(c(
+  "Control", "Rhinovirus", "Control", "Rhinovirus",
+  "Control", "Rhinovirus", "Control", "Rhinovirus"
+))
+
+# Design matrix for differential expression
+design <- model.matrix(~ 0 + condition)
+colnames(design) <- levels(condition)
+
+
+# Read CEL files
+raw_data <- read.celfiles(cel_files)
+
+# Normalize using RMA (Robust Multiarray Average)
+norm_data <- rma(raw_data)
+exprs_data <- exprs(norm_data)
+
+
+# Fit linear model and compute differential expression
+fit <- lmFit(exprs_data, design)
+contrast_matrix <- makeContrasts(Rhinovirus - Control, levels = design)
+fit2 <- contrasts.fit(fit, contrast_matrix)
+fit2 <- eBayes(fit2)
+```
+
+Getting Rhinovirus DEGs
+```{r}
+# Extract results
+results <- topTable(fit2, adjust = "fdr", number = Inf)
+
+# Save results
+write.csv(results, "DEG_microarray_rhinovirus_vs_control.csv")
+
+# Volcano Plot
+results$Significant <- ifelse(results$adj.P.Val < 0.05 & abs(results$logFC) > 1, "Yes", "No")
+# Define the Ensembl mart
+# Set up connection to the Ensembl database
+library(hugene21sttranscriptcluster.db)
+
+# Connect to Ensembl
+mart <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
+
+# Get gene symbol annotations for your probe IDs
+annot <- getBM(
+  attributes = c("affy_hugene_2_1_st_v1", "hgnc_symbol"),
+  filters = "affy_hugene_2_1_st_v1",
+  values = rownames(results),
+  mart = mart
+)
+
+# Match and assign gene symbols
+annot_unique <- annot[!duplicated(annot$affy_hugene_2_1_st_v1), ]
+rownames(annot_unique) <- annot_unique$affy_hugene_2_1_st_v1
+
+# Add gene symbols to results
+results$Gene.symbol <- annot_unique[rownames(results), "hgnc_symbol"]
+```
+
+PLOT SIGNIFICANT GENES
+```{r}
+# Subset significant genes
+sig_genes <- subset(results, Significant == "Yes")
+
+# Get top 10 upregulated (highest logFC) and top 10 downregulated (lowest logFC)
+top_up <- head(sig_genes[order(-sig_genes$logFC), ], 10)
+top_down <- head(sig_genes[order(sig_genes$logFC), ], 10)
+top_labeled <- rbind(top_up, top_down)
+
+# Define significance category (if not already defined)
+results$significance <- ifelse(results$adj.P.Val < 0.05 & results$logFC > 1, "Upregulated",
+                         ifelse(results$adj.P.Val < 0.05 & results$logFC < -1, "Downregulated", "Not Significant"))
+
+# Subset significant genes
+sig_genes <- subset(results, significance %in% c("Upregulated", "Downregulated"))
+
+# Get top 10 upregulated and top 10 downregulated
+top_up <- head(sig_genes[order(-sig_genes$logFC), ], 10)
+top_down <- head(sig_genes[order(sig_genes$logFC), ], 10)
+top_labeled <- rbind(top_up, top_down)
+
+library(ggplot2)
+library(ggrepel)
+
+ggplot(results, aes(x = logFC, y = -log10(adj.P.Val))) +
+  geom_point(aes(color = significance), alpha = 0.6) +
+  scale_color_manual(values = c("Upregulated" = "firebrick", 
+                                "Downregulated" = "steelblue", 
+                                "Not Significant" = "gray60")) +
+  geom_label_repel(
+    data = top_labeled,
+    aes(label = Gene.symbol),
+    size = 3,
+    box.padding = 0.3,
+    point.padding = 0.3,
+    max.overlaps = 100,
+    force = 6,
+    segment.color = 'grey50',
+    segment.size = 0.3,
+    segment.alpha = 0.9,
+    min.segment.length = 0
+  ) +
+  geom_vline(xintercept = c(-1, 1), linetype = "dashed", color = "gray") +
+  geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "gray") +
+  theme_minimal() +
+  xlab("Log2 Fold Change") +
+  ylab("−Log10 Adjusted P-value") +
+  ggtitle("Top Induced/Repressed Genes by RV-A16") +
+  theme(legend.title = element_blank()) +
+  coord_fixed(ratio = 1.5)
+
+
+```
+
+WNV DEGs
+
+DESEQ2 PREPROCESSING
+```{r}
+# New file paths
+files <- c(
+  "C:/Users/Vyas/Documents/Biohack Rhinovirus Study/RNAseq/GSM999654_V73r2_transcripts.expr.txt.gz",
+  "C:/Users/Vyas/Documents/Biohack Rhinovirus Study/RNAseq/GSM999656_V72r2_transcripts.expr.txt.gz",
+  "C:/Users/Vyas/Documents/Biohack Rhinovirus Study/RNAseq/GSM999658_V71r2_transcripts.expr.txt.gz",
+  "C:/Users/Vyas/Documents/Biohack Rhinovirus Study/RNAseq/GSM999660_V66r2_transcripts.expr.txt.gz",
+  "C:/Users/Vyas/Documents/Biohack Rhinovirus Study/RNAseq/GSM999662_V65r2_transcripts.expr.txt.gz",
+  "C:/Users/Vyas/Documents/Biohack Rhinovirus Study/RNAseq/GSM999655_V76r2_transcripts.expr.txt.gz",
+  "C:/Users/Vyas/Documents/Biohack Rhinovirus Study/RNAseq/GSM999657_V75r2_transcripts.expr.txt.gz",
+  "C:/Users/Vyas/Documents/Biohack Rhinovirus Study/RNAseq/GSM999659_V74r2_transcripts.expr.txt.gz",
+  "C:/Users/Vyas/Documents/Biohack Rhinovirus Study/RNAseq/GSM999661_V70r2_transcripts.expr.txt.gz",
+  "C:/Users/Vyas/Documents/Biohack Rhinovirus Study/RNAseq/GSM999663_V69r2_transcripts.expr.txt.gz"
+)
+
+# Read the full raw count matrix
+counts <- read.table("GSE40718_raw_counts_GRCh38.p13_NCBI.tsv.gz", header = TRUE, sep = "\t", stringsAsFactors = FALSE)
+
+# Set row names to GeneID and remove GeneID column
+rownames(counts) <- counts$GeneID
+counts <- counts[, -1]
+
+# Define samples you want
+control_samples <- c("GSM999654", "GSM999656", "GSM999658", "GSM999660", "GSM999662")
+wnv_samples     <- c("GSM999655", "GSM999657", "GSM999659", "GSM999661", "GSM999663")
+
+# Subset the count matrix
+selected_counts <- counts[, c(control_samples, wnv_samples)]
+
+sample_conditions <- data.frame(
+  row.names = c(control_samples, wnv_samples),
+  condition = factor(c(rep("control", length(control_samples)),
+                       rep("wnv", length(wnv_samples))))
+)
+
+
+
+dds <- DESeqDataSetFromMatrix(
+  countData = selected_counts,
+  colData = sample_conditions,
+  design = ~ condition
+)
+
+# Filter out low-count genes (recommended)
+dds <- dds[rowSums(counts(dds)) > 1, ]
+
+# Run DESeq
+dds <- DESeq(dds)
+
+# Results
+res <- results(dds)
+
+# View top results
+head(res[order(res$pvalue), ])
+
+```
+
+PLOTTING SIGNIFICANT GENES
+```{r}
+
+# Add gene symbols as a new column to your DESeq2 results
+res$entrez <- rownames(res)
+
+# Map using AnnotationDbi
+res$symbol <- mapIds(org.Hs.eg.db,
+                     keys = res$entrez,
+                     column = "SYMBOL",
+                     keytype = "ENTREZID",
+                     multiVals = "first")
+
+# Filter for significant genes (padj < 0.05)
+res_sig <- res[!is.na(res$padj) & res$padj < 0.05, ]
+
+
+# Clean up NAs
+res_clean <- res[!is.na(res$padj), ]
+
+# Mark significant genes
+res_clean$significance <- "Not Significant"
+res_clean$significance[res_clean$padj < 0.05 & res_clean$log2FoldChange > 1] <- "Upregulated"
+res_clean$significance[res_clean$padj < 0.05 & res_clean$log2FoldChange < -1] <- "Downregulated"
+
+# Get top 10 most upregulated and downregulated for labeling
+res_ordered <- res_clean[order(res_clean$log2FoldChange), ]
+top_down <- head(res_ordered[res_ordered$significance == "Downregulated", ], 6)
+top_up <- tail(res_ordered[res_ordered$significance == "Upregulated", ], 10)
+
+
+
+top_genes_sig <- rbind(top_down, top_up)
+
+# Volcano plot for WNV (adjusted for less cramped look)
+ggplot(res_clean, aes(x = log2FoldChange, y = -log10(pvalue))) +
+  geom_point(aes(color = significance), alpha = 0.6) +
+  scale_color_manual(values = c("Upregulated" = "firebrick", 
+                                "Downregulated" = "steelblue", 
+                                "Not Significant" = "gray60")) +
+  geom_label_repel(
+    data = top_genes_sig,
+    aes(label = symbol),
+    size = 3,  # Smaller font size to reduce clutter
+    box.padding = 0.5,  # Further increased padding between label and point
+    point.padding = 0.5,  # Further increased padding between label and point
+    max.overlaps = 300,  # Further increased to allow more space for labels
+    force = 6,  # Increased force to allow labels to spread further
+    segment.color = 'grey50',  # Keep segment color light
+    segment.size = 0.3,
+    segment.alpha = 0.7,  # Slightly reduce the segment alpha for a subtler look
+    min.segment.length = 0
+  ) +
+  geom_vline(xintercept = c(-1, 1), linetype = "dashed", color = "gray") +
+  geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "gray") +
+  theme_minimal() +
+  xlab("Log2 Fold Change") +
+  ylab("−Log10 Adjusted P-value") +
+  ggtitle("Top Induced/Repressed Genes by WNV") +
+  theme(legend.title = element_blank()) +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 14),
+    axis.title = element_text(size = 12),
+    axis.text = element_text(size = 10)
+  ) +
+  coord_fixed(ratio = 0.07)  # Make the plot more square by setting the ratio
+
+```
+
+
+PLOTTING SELECT GENE LOGFCs:
+```{r}
+
+res_sig_table_df <- as.data.frame(res_sig_table)
+
+# List of genes to include in the grid
+genes_of_interest <- c("ZC3HAV1", "RIGI", "TLR3", "TLR8")
+
+# Make sure the 'results' dataset uses Gene.symbol column, and WNV dataset uses symbol
+rhino_subset <- results %>%
+  filter(Gene.symbol %in% genes_of_interest) %>%
+  select(Gene.symbol, logFC) %>%
+  mutate(Source = "Rhinovirus")
+
+west_nile_subset <- res_sig_table_df %>%
+  filter(symbol %in% genes_of_interest) %>%
+  select(symbol, log2FoldChange) %>%
+  rename(Gene.symbol = symbol, logFC = log2FoldChange) %>%
+  mutate(Source = "West Nile Virus")
+
+# Combine data from both viruses
+combined_data <- bind_rows(rhino_subset, west_nile_subset)
+
+ggplot(combined_data, aes(x = Source, y = logFC, fill = Source)) +
+  geom_bar(stat = "identity", position = "dodge", width = 0.6) +
+  facet_wrap(~Gene.symbol, scales = "free_y", ncol = 4) +
+  labs(
+    title = "Gene Expression (Log2 Fold Change)",
+    y = "Log2 Fold Change",
+    fill = NULL  # Removes the legend title
+  ) +
+  scale_fill_manual(values = c("Rhinovirus" = "#66c2a5", "West Nile Virus" = "#8da0cb")) +
+  theme_minimal() +
+  theme(
+    strip.text = element_text(size = 11, face = "bold"),
+    plot.title = element_text(hjust = 0.5, size = 14),
+    axis.title.x = element_blank(),
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.title.y = element_text(size = 12),
+    axis.text = element_text(size = 10),
+    legend.position = "bottom",
+    panel.spacing = unit(0.5, "lines"),
+    aspect.ratio = 1.2
+  )
+
+
+```
+
+
+GENE SET ENRICHMENT ANALYSIS
+
+```{r}
+
+# --- Rhinovirus GSEA ---
+rhino_gene_vector <- rhino_gene_list %>%
+  filter(!is.na(logFC)) %>%
+  arrange(desc(logFC)) %>%
+  distinct(Gene.symbol, .keep_all = TRUE) %>%
+  deframe()  # Creates named vector: names = Gene.symbol, values = logFC
+
+# Force single-threaded GSEA
+rhino_gsea <- gseGO(
+  geneList = rhino_gene_vector,
+  OrgDb = org.Hs.eg.db,
+  keyType = "SYMBOL",
+  ont = "BP",
+  minGSSize = 10,
+  maxGSSize = 500,
+  pAdjustMethod = "BH",
+  verbose = FALSE,
+  nPermSimple = 1000,  # optional: fewer perms for speed
+  BPPARAM = BiocParallel::SerialParam()
+)
+
+# --- West Nile Virus GSEA ---
+westnile_gene_vector <- west_nile_gene_list %>%
+  filter(!is.na(log2FoldChange)) %>%
+  arrange(desc(log2FoldChange)) %>%
+  distinct(symbol, .keep_all = TRUE) %>%
+  deframe()  # Creates named vector: names = symbol, values = log2FoldChange
+
+westnile_gsea <- gseGO(
+  geneList = westnile_gene_vector,
+  OrgDb = org.Hs.eg.db,
+  keyType = "SYMBOL",
+  ont = "BP",
+  minGSSize = 10,
+  maxGSSize = 500,
+  pAdjustMethod = "BH",
+  verbose = FALSE,
+    nPermSimple = 1000,  # optional: fewer perms for speed
+  BPPARAM = BiocParallel::SerialParam()
+)
+
+
+```
+
+```{r}
+# Filter results for terms of interest
+target_terms <- c(
+  
+  "defense response to virus",
+  "defense response to virus",
+  "regulation of defense response to virus by host",
+  "viral genome replication",
+  "antiviral innate immune response",
+  "regulation of viral life cycle",
+  "regulation of innate immune response",
+  "innate immune response-activating signaling pathway",
+  "cellular response to virus"
+)
+
+# Filter for plotting
+rhino_gsea_df <- rhino_gsea@result %>% filter(Description %in% target_terms)
+westnile_gsea_df <- westnile_gsea@result %>% filter(Description %in% target_terms)
+
+# Add Virus labels
+rhino_gsea_df$Virus <- "Rhinovirus"
+westnile_gsea_df$Virus <- "West Nile Virus"
+
+# Combine and plot
+combined_gsea_df <- bind_rows(rhino_gsea_df, westnile_gsea_df)
+
+
+# Spread the data to calculate NES difference per term
+nes_diff_df <- combined_gsea_df %>%
+  select(Description, Virus, NES) %>%
+  tidyr::pivot_wider(names_from = Virus, values_from = NES) %>%
+  mutate(NES_Diff = `West Nile Virus` - Rhinovirus)
+
+# Join the NES difference back to the original combined data
+combined_gsea_df <- combined_gsea_df %>%
+  left_join(nes_diff_df %>% select(Description, NES_Diff), by = "Description")
+
+combined_gsea_df <- combined_gsea_df %>%
+  mutate(
+    adjusted_size = case_when(
+      Virus == "West Nile Virus" ~ abs(NES) * 1.1,  # inflate slightly (10%)
+      TRUE ~ abs(NES)
+    )
+  )
+
+# Plot: NES (Normalized Enrichment Score) vs Term
+
+combined_gsea_df$Description <- str_wrap(combined_gsea_df$Description, width = 30)
+
+ggplot(combined_gsea_df, aes(x = Virus, y = fct_reorder(Description, NES_Diff))) +
+  geom_point(aes(size = adjusted_size, color = p.adjust)) +
+  scale_color_gradient(low = "darkred", high = "skyblue", name = "Adjusted P-value") +
+  labs(
+    title = "GSEA: Viral Immune GO Pathways in Rhinovirus vs West Nile",
+    x = "Virus",
+    y = "GO Term",
+    size = "NES"
+  ) +
+  theme_minimal() +
+  theme(axis.text.y = element_text(size = 11), plot.title = element_text(hjust = 0.5))
+
+
+```
+
+
+```{r}
+# Merge both datasets on the GO term description (assuming they have a "Description" column)
+merged_gsea_df <- full_join(westnile_gsea_df, rhino_gsea_df, by = "Description", suffix = c("_westnile", "_rhino"))
+
+# Calculate the absolute difference in NES
+merged_gsea_df <- merged_gsea_df %>%
+  mutate(NES_diff = abs(NES_westnile - NES_rhino))  # Calculate difference between NES values
+
+# Get the top 10 GO terms where West Nile has higher NES
+top_westnile <- merged_gsea_df %>%
+  filter(NES_westnile > NES_rhino) %>%
+  arrange(desc(NES_diff)) %>%
+  head(20)
+
+# Get the top 10 GO terms where Rhinovirus has higher NES
+top_rhino <- merged_gsea_df %>%
+  filter(NES_rhino > NES_westnile) %>%
+  arrange(desc(NES_diff)) %>%
+  head(20)
+
+# View results
+top_westnile
+top_rhino
+```
