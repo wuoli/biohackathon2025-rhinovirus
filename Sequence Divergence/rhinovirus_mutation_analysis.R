@@ -4,10 +4,10 @@ library(DECIPHER)
 #------------------------ Part 0: Preprocessing and Alignment------------------------
 
 # Step 0.1: Specify directory containing FASTA files
-setwd("/Users/oreomilk/Desktop/Rhinovirus Strains")
-fasta_file <- "/Users/oreomilk/Desktop/Rhinovirus Strains/blast2-sequences.txt"
-metadata_file <- "/Users/oreomilk/Desktop/Rhinovirus Strains/metadata.tsv"
-alignment_file <- "/Users/oreomilk/Desktop/Rhinovirus Strains/alignment2.fasta"
+setwd("/Users/oreomilk/Desktop/Biohack25")
+fasta_file <- "/Users/oreomilk/Desktop/Biohack25/Code/Strains/54_rhinovirus_strains/blast2-sequences.txt"
+metadata_file <- "/Users/oreomilk/Desktop/Biohack25/Code/Strains/54_rhinovirus_strains/metadata.tsv"
+alignment_file <- "/Users/oreomilk/Desktop/Biohack25/Code/Strains/54_rhinovirus_strains/alignment2.fasta"
 
 # Step 0.2: read dna sequences and metadata
 all_genomes <- readDNAStringSet(fasta_file)
@@ -376,9 +376,9 @@ data <- data.frame(
 ggplot(data, aes(x = Virus, y = MutationRate, fill = Virus)) +
   geom_bar(stat = "identity", width = 0.6) +
   labs(
-    y = "Mutation Rate",
+    y = "Sequence Divergence Rate",
     x = "Virus",
-    title = "Mutation Rates of Viruses"
+    title = "Sequence Divergence Rate of Viruses"
   ) +
   theme_minimal() +
   theme(
