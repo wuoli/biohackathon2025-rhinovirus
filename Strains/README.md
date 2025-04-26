@@ -1,4 +1,4 @@
-Rhinovirus Strains Used for the Paper
+Viral Strain Sequences and Metadata Used
 - 
 
 The naming of the folders follow "$(number of sequences used)_$(species)_strains".
