@@ -1,7 +1,7 @@
 Viral Strain Sequences and Metadata Used
 - 
 
-The naming of the folders follow "$(number of sequences used)_$(species)_strains".
+The naming of the folders follow `$(number of sequences used)_$(species)_strains`.
 1. 16_rhinovirus_strains: used for Codon Usage Bias and Genomic Repeats analysis
 2. 12_westnile_strains: used for Cdon Usage Bias and Genomic Repeats analysis
 3. 54_rhinovirus_strains: used for Divergence Rate analysis
