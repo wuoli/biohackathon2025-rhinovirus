@@ -109,9 +109,13 @@ The work is soon to be available as an open-access publication through **eSchola
 
 ---
 
-## Team
+## Team & Contributions
 
-- Flicka Zhang
-- Olivia Wu
-- Priya Ravi
-- Vyas Koduvayur
+| Team Member | Primary Contributions |
+|---|---|
+| **Vyas Koduvayur** | Genomic repeats; host innate immune activation |
+| **Flicka Zhang** | Genomic repeats |
+| **Priya Ravi** | Codon usage bias |
+| **Olivia Wu** | Sequence divergence |
+
+All team members contributed to **brainstorming, analysis, writing, and making the poster**.
