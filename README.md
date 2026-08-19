@@ -97,7 +97,7 @@ This project was independently conducted by a four-person team as part of the **
 
 The project was subsequently submitted to the **2025–2026 UCLA Library Prize for Undergraduate Research**, where it received **1st Place in Science, Engineering & Mathematics**.
 
-The work is soon to be available as an open-access publication through **eScholarship**, the University of California's open-access publishing platform.
+As part of the library prize, the work is soon to be available as an open-access publication through **eScholarship**, the University of California's open-access publishing platform.
 
 ---
 
