@@ -1,9 +1,8 @@
 # Human Rhinovirus Leverages Multi-Layered Immune Evasion Mechanisms to Bypass Host Defenses
 
-**INT Biohackathon 2025 — Team 4**  
 **Flicka Zhang · Olivia Wu · Priya Ravi · Vyas Koduvayur**
 
-[View Paper](PAPER_LINK) · [View Poster](POSTER_LINK)
+[View Research Paper](https://drive.google.com/file/d/1l3X1VIDL33lJwIbR2CnSo_1_8huHdMby/view?usp=sharing) · [View Poster](https://drive.google.com/file/d/1udSs_d-0xNAOIgPOMehtr5-psVlmVQI4/view?usp=sharing)
 
 ---
 
@@ -94,7 +93,7 @@ Our work proposes a **mechanism-based framework** for understanding HRV immune e
 
 ## Project Recognition
 
-This project was independently conducted by a four-person team as part of the **UCLA INT Biohackathon 2025 — Team 4**.
+This project was independently conducted by a four-person team as part of the **In Transcription @UCLA's Biohackathon 2025 — Team 4**.
 
 The project was subsequently submitted to the **2025–2026 UCLA Library Prize for Undergraduate Research**, where it received **1st Place in Science, Engineering & Mathematics**.
 
@@ -104,8 +103,8 @@ The work is soon to be available as an open-access publication through **eSchola
 
 ## Research Outputs
 
-- **Research Paper:** [View Paper](PAPER_LINK)
-- **Conference Poster:** [View Poster](POSTER_LINK)
+- **Research Paper:** [View Paper](https://drive.google.com/file/d/1l3X1VIDL33lJwIbR2CnSo_1_8huHdMby/view?usp=sharing)
+- **Poster:** [View Poster](https://drive.google.com/file/d/1udSs_d-0xNAOIgPOMehtr5-psVlmVQI4/view?usp=sharing)
 - **eScholarship Publication:** *Coming soon*
 
 ---
@@ -116,5 +115,3 @@ The work is soon to be available as an open-access publication through **eSchola
 - Olivia Wu
 - Priya Ravi
 - Vyas Koduvayur
-
-**INT Biohackathon 2025 — Team 4**
