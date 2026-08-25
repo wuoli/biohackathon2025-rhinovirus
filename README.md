@@ -87,7 +87,7 @@ Together, these findings support a multi-layered model in which distinct viral a
 
 Although individual mechanisms of HRV immune evasion have been studied previously, their interaction across genomic, transcriptional, and evolutionary scales has received less attention.
 
-Our work proposes a **mechanism-based framework** for understanding HRV immune evasion, highlighting how multiple adaptations can function together as a cohesive strategy. This perspective may help inform future approaches to vaccine and antiviral development.
+Our work proposes a mechanism-based framework for understanding HRV immune evasion, highlighting how multiple adaptations can function together as a cohesive strategy. This perspective may help inform future approaches to vaccine and antiviral development.
 
 ---
 
@@ -105,7 +105,7 @@ As part of the library prize, the work is soon to be available as an open-access
 
 - **Research Paper:** [View Paper](https://drive.google.com/file/d/1l3X1VIDL33lJwIbR2CnSo_1_8huHdMby/view?usp=sharing)
 - **Poster:** [View Poster](https://drive.google.com/file/d/1udSs_d-0xNAOIgPOMehtr5-psVlmVQI4/view?usp=sharing)
-- **eScholarship Publication:** *Coming soon*
+- **eScholarship Publication:** *Coming November 2026*
 
 ---
 
@@ -113,9 +113,9 @@ As part of the library prize, the work is soon to be available as an open-access
 
 | Team Member | Primary Contributions |
 |---|---|
-| **Vyas Koduvayur** | Genomic repeats; host innate immune activation |
-| **Priya Ravi** | Codon usage bias |
-| **Flicka Zhang** | host innate immune activation |
-| **Olivia Wu** | Sequence divergence |
+| **Vyas Koduvayur** | Genomic repeats analysis; host innate immune activation analysis |
+| **Priya Ravi** | Codon usage bias analysis |
+| **Flicka Zhang** | Host innate immune activation analysis |
+| **Olivia Wu** | Sequence divergence analysis |
 
 All team members contributed to **brainstorming, analysis, writing, and making the poster**.
